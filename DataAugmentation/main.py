@@ -144,8 +144,8 @@ if json_input:
             st.session_state["entity_swaps"] = []
 
         st.write("### Enter Entity Replacements:")
-        new_entity = st.text_input("Entity to Replace:")
-        replacement = st.text_input("Replace with:")
+        new_entity = st.text_input("Entity to Replace:",autocomplete="off")
+        replacement = st.text_input("Replace with:",autocomplete="off")
 
         if st.button("Add Entity Swap"):
             if new_entity and replacement:
