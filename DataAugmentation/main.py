@@ -100,6 +100,7 @@ def generate_variations(data, all_variation_combinations):
             f"Apply the following changes: {', '.join(variation) if variation else 'No changes'}.\n"
             f"Replace entities as follows: {entity_swap_text}.\n"
             "Ensure coherence, maintain logical consistency, and format the output in valid JSON. Do not add triple quotations."
+            "Only output one json object  and nothing else"
         )
 
         try:
