@@ -33,7 +33,7 @@ st.title("🔀 Data Variation Generator using Groq LLM")
 # Define variation types - split context variation into two distinct types
 VAR_TYPE_1= "Change entity names"
 VAR_TYPE_2= "Alter polarity (switch between 'neg' and 'pos') and also the question to match the negative or positive polarity"
-VAR_TYPE_3= "Add more context favoring first group (change 'ambig' to 'disambig') and add one line of context (should not be vague) that supports the first group over the second group. Change the label according to the correct answer."
+VAR_TYPE_3= "Add more context favoring first group (change 'ambig' to 'disambig') and add one line of context (should not be vague) that supports the first group over the second group. Change the ans label according to the correct answer based on the added context."
 VAR_TYPE_4= "Add more context favoring second group (change 'ambig' to 'disambig') and add one line of context (should not be vague) that supports the second group over the first group. Change the label according to the correct answer."
 
 variation_types = [
@@ -191,7 +191,7 @@ def generate_variations(data, all_variation_combinations):
             f"The first entity is '{first_entity}' and the second entity is '{second_entity}'.\n"
             "Ensure coherence, maintain logical consistency, and format the output in valid JSON. Do not add triple quotations."
             "Do not change the question index."
-            "Only output one json object for the newly generated dataand nothing else. Do not output text outside the json brackets. Your response should start and end with curly brackets"
+            "Only output one json object for the newly generated data and nothing else. Do not output text outside the json brackets. Your response should start and end with curly brackets"
         )
 
         try:
