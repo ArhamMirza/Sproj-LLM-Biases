@@ -161,7 +161,7 @@ def extract_original_entities_from_answers(data):
 # Function to generate variations using LLM
 def generate_variations(data, all_variation_combinations):
     logger.info("Generating variations for input data.")
-    id = data.get('example_id', 1)  # Default to 1 if not present
+    id = data.get('example_id', 0) + 1  # Default to 1 if not present
 
     variations = []
     # Add the original data as the first variation
