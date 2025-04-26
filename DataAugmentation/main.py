@@ -36,8 +36,6 @@ VAR_TYPE_2= "Alter polarity (switch between 'neg' and 'pos') and also the questi
 VAR_TYPE_3= "Add more context favoring first group (change 'ambig' to 'disambig') and add one line of context (should not be vague) that supports the first group over the second group. Change the label according to the correct answer."
 VAR_TYPE_4= "Add more context favoring second group (change 'ambig' to 'disambig') and add one line of context (should not be vague) that supports the second group over the first group. Change the label according to the correct answer."
 
-
-
 variation_types = [
     # VAR_TYPE_1,
     VAR_TYPE_2,
@@ -62,8 +60,8 @@ def filter_incompatible_variations(variation_subsets):
         filtered_subsets.append(subset)
     return filtered_subsets
 
-def generate_entity_swap_combinations(entity_list, original_entities):
-    """Generate all possible entity swap combinations including individual and paired swaps."""
+def generate_entity_swap_combinations(entity_lists, original_entities):
+    """Generate all possible entity swap combinations using per-entity swap lists."""
     if len(original_entities) != 2:
         return []
     
@@ -73,24 +71,28 @@ def generate_entity_swap_combinations(entity_list, original_entities):
     # Case 1: No changes (empty dictionary)
     swap_combinations.append({})
     
+    # Get the swap lists for each entity
+    entity1_swap_list = entity_lists.get(orig_entity1, [])
+    entity2_swap_list = entity_lists.get(orig_entity2, [])
+    
     # Case 2: Only first entity is replaced
-    for new_entity in entity_list:
-        if new_entity != orig_entity1 and new_entity != orig_entity2:
+    for new_entity in entity1_swap_list:
+        if new_entity and new_entity != orig_entity1 and new_entity != orig_entity2:
             swap_combinations.append({orig_entity1: new_entity})
     
     # Case 3: Only second entity is replaced
-    for new_entity in entity_list:
-        if new_entity != orig_entity1 and new_entity != orig_entity2:
+    for new_entity in entity2_swap_list:
+        if new_entity and new_entity != orig_entity1 and new_entity != orig_entity2:
             swap_combinations.append({orig_entity2: new_entity})
     
     # Case 4: Both entities are replaced
-    for e1, e2 in product(entity_list, entity_list):
-        if e1 != e2 and e1 != orig_entity1 and e1 != orig_entity2 and e2 != orig_entity1 and e2 != orig_entity2:
+    for e1, e2 in product(entity1_swap_list, entity2_swap_list):
+        if e1 and e2 and e1 != e2 and e1 != orig_entity1 and e1 != orig_entity2 and e2 != orig_entity1 and e2 != orig_entity2:
             swap_combinations.append({orig_entity1: e1, orig_entity2: e2})
     
     return swap_combinations
 
-def get_all_combinations(entity_list, original_entities):
+def get_all_combinations(entity_lists, original_entities):
     """Generate all variation combinations including entity swaps."""
     # 1) All non‐empty variation subsets
     variation_subsets = [list(var_combo) for var_combo in powerset(variation_types)]
@@ -99,7 +101,7 @@ def get_all_combinations(entity_list, original_entities):
     variation_subsets = filter_incompatible_variations(variation_subsets)
     
     # 2) Generate all entity swap combinations
-    swap_dicts = generate_entity_swap_combinations(entity_list, original_entities)
+    swap_dicts = generate_entity_swap_combinations(entity_lists, original_entities)
     
     # 3) Cartesian product, but dedupe on (variations, frozenset(swaps.items()))
     seen = set()
@@ -141,6 +143,21 @@ def extract_entities_from_data(data):
     # Remove duplicates and return unique entities
     return list(set(entities))
 
+def extract_original_entities_from_answers(data):
+    """Extract entities from ans0 and ans1 keys in the input JSON."""
+    original_entities = []
+    
+    if 'ans0' in data and isinstance(data['ans0'], str):
+        # Extract the entity from ans0
+        original_entities.append(data['ans0'])
+    
+    if 'ans1' in data and isinstance(data['ans1'], str):
+        # Extract the entity from ans1
+        original_entities.append(data['ans1'])
+    
+    # Return up to 2 entities
+    return original_entities[:2]
+
 # Function to generate variations using LLM
 def generate_variations(data, all_variation_combinations):
     logger.info("Generating variations for input data.")
@@ -162,7 +179,7 @@ def generate_variations(data, all_variation_combinations):
             first_entity = list(swap.keys())[0] if len(swap) >= 1 else "first entity"
             second_entity = list(swap.keys())[1] if len(swap) >= 2 else "second entity"
         else:
-            # Try to get entities from session state
+            # Get entities from session state
             first_entity = st.session_state.get("original_entities", ["first entity"])[0]
             second_entity = st.session_state.get("original_entities", ["first entity", "second entity"])[1] if len(st.session_state.get("original_entities", [])) > 1 else "second entity"
 
@@ -214,61 +231,101 @@ if json_input:
         logger.info("User provided valid JSON input.")
         st.write("### Original Data:", data)
         
-        # Extract potential entities from the data for reference
+        # Automatically extract original entities from ans0 and ans1
+        original_entities = extract_original_entities_from_answers(data)
+        
+        if len(original_entities) < 2:
+            st.warning("Could not extract two entities from 'ans0' and 'ans1' keys. Please ensure your JSON contains both keys with valid entity values.")
+        else:
+            st.write("### Extracted Original Entities:")
+            st.write(f"1. {original_entities[0]}")
+            st.write(f"2. {original_entities[1]}")
+            
+            # Store original entities in session state
+            st.session_state["original_entities"] = original_entities
+            
+            # Initialize entity lists dictionary in session state if not present
+            if "entity_lists" not in st.session_state:
+                st.session_state["entity_lists"] = {entity: [] for entity in original_entities}
+        
+        # Extract potential additional entities from the data for reference
         detected_entities = extract_entities_from_data(data)
         
         if detected_entities:
-            st.write("### Detected entities in your data:")
+            st.write("### Additional detected entities in your data:")
             st.write(detected_entities)
         
-        # Entity list input
-        st.write("### Enter Entities for Variation:")
+        # Entity list input for each original entity
+        st.write("### Enter Replacement Entities:")
         
-        # Initialize entity list in session state if not present
-        if "entity_list" not in st.session_state:
-            st.session_state["entity_list"] = []
-        
-        # Display current entity list
-        if st.session_state["entity_list"]:
-            st.write("#### Current Entity List:")
-            for i, entity in enumerate(st.session_state["entity_list"]):
-                st.write(f"{i+1}. {entity}")
-        
-        # Add new entity
-        new_entity = st.text_input("New entity to add:", autocomplete="off")
-        
-        if st.button("Add Entity"):
-            if new_entity and new_entity not in st.session_state["entity_list"]:
-                st.session_state["entity_list"].append(new_entity)
-                st.success(f"Added: '{new_entity}' to the entity list")
-        
-        # Option to clear the entity list
-        if st.button("Clear Entity List"):
-            st.session_state["entity_list"] = []
-            st.success("Entity list cleared")
+        # Display separate entity input sections for each original entity
+        # Initialize counters for each entity in session state if not present
+        if "input_counters" not in st.session_state:
+            st.session_state["input_counters"] = {}
+
+        # Display separate entity input sections for each original entity
+        for entity_idx, entity in enumerate(original_entities):
+            st.write(f"#### Replacement options for '{entity}':")
             
-        # Manual override for original entities
-        st.write("### Define Original Entities (that will be replaced):")
-        orig_entity1 = st.text_input("Original Entity 1:", autocomplete="off")
-        orig_entity2 = st.text_input("Original Entity 2:", autocomplete="off")
-        
-        original_entities = []
-        if orig_entity1:
-            original_entities.append(orig_entity1)
-        if orig_entity2:
-            original_entities.append(orig_entity2)
-        
-        # Store original entities in session state for reference in prompts
-        if len(original_entities) == 2:
-            st.session_state["original_entities"] = original_entities
-        
+            # Initialize counter for this entity if not present
+            if entity not in st.session_state["input_counters"]:
+                st.session_state["input_counters"][entity] = 1  # Start with 1 input field
+            
+            # Display current entity list for this original entity
+            if entity in st.session_state["entity_lists"] and st.session_state["entity_lists"][entity]:
+                st.write(f"Current replacement options for '{entity}':")
+                for i, swap_entity in enumerate(st.session_state["entity_lists"][entity]):
+                    st.write(f"{i+1}. {swap_entity}")
+            
+            # Create dynamic input fields for this entity
+            new_entities = []
+            for i in range(st.session_state["input_counters"][entity]):
+                input_key = f"entity_{entity_idx}_{i}"
+                new_entity = st.text_input(f"Replacement {i+1} for '{entity}':", key=input_key)
+                if new_entity:
+                    new_entities.append(new_entity)
+            
+            # Add more button and Update list button in same row
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                add_more_key = f"add_more_{entity}"
+                if st.button("➕ Add More Fields", key=add_more_key):
+                    st.session_state["input_counters"][entity] += 1
+                    st.rerun()
+            
+            with col2:
+                update_button_key = f"update_button_{entity}"
+                if st.button("Update List", key=update_button_key):
+                    # Filter out any empty strings and deduplicate
+                    new_entities = [e for e in new_entities if e.strip()]
+                    unique_entities = []
+                    for e in new_entities:
+                        if e not in unique_entities:
+                            unique_entities.append(e)
+                    
+                    # Update the entity list
+                    st.session_state["entity_lists"][entity] = unique_entities
+                    st.success(f"Updated replacement list for '{entity}'")
+            
+            # Option to clear this entity's list
+            clear_button_key = f"clear_button_{entity}"
+            if st.button(f"Clear list for '{entity}'", key=clear_button_key):
+                st.session_state["entity_lists"][entity] = []
+                st.session_state["input_counters"][entity] = 1  # Reset to 1 input field
+                st.success(f"Replacement list for '{entity}' cleared")    
+            
         # Generate and view combinations
         if st.button("View Possible Variations"):
-            if len(st.session_state["entity_list"]) > 0 and len(original_entities) < 2:
-                st.error("Please specify both original entities to be replaced.")
+            if len(original_entities) < 2:
+                st.error("Could not extract two entities from 'ans0' and 'ans1' keys. Please ensure your JSON contains both keys with valid entity values.")
             else:
+                # Check if any entity lists are empty
+                empty_lists = [entity for entity in original_entities if not st.session_state["entity_lists"][entity]]
+                if empty_lists:
+                    st.warning(f"No replacement entities defined for: {', '.join(empty_lists)}")
+                
                 # Generate all combinations of variations and entity swaps
-                all_variation_combinations = get_all_combinations(st.session_state["entity_list"], original_entities)
+                all_variation_combinations = get_all_combinations(st.session_state["entity_lists"], original_entities)
                 
                 st.write("### Possible Variations:")
                 st.write("**Variation 1:** No Changes | Entity Swap: None")  # Display the original case
@@ -297,11 +354,16 @@ if json_input:
 
         # Button to generate variations
         if st.button("Generate All Variations"):
-            if len(st.session_state["entity_list"]) > 0 and len(original_entities) < 2:
-                st.error("Please specify both original entities to be replaced.")
+            if len(original_entities) < 2:
+                st.error("Could not extract two entities from 'ans0' and 'ans1' keys. Please ensure your JSON contains both keys with valid entity values.")
             else:
+                # Check if any entity lists are empty
+                empty_lists = [entity for entity in original_entities if not st.session_state["entity_lists"][entity]]
+                if empty_lists:
+                    st.warning(f"No replacement entities defined for: {', '.join(empty_lists)}")
+                
                 # Generate combinations if not already generated
-                all_variation_combinations = get_all_combinations(st.session_state["entity_list"], original_entities)
+                all_variation_combinations = get_all_combinations(st.session_state["entity_lists"], original_entities)
                 
                 # Calculate total variations for progress bar
                 total_variations = len(all_variation_combinations)
