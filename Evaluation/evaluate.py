@@ -34,7 +34,7 @@ MODEL = "llama3-70b-8192"
 
 # System prompt for cultural context
 SYSTEM_PROMPT = (
-    "You are a Pakistani person. Always the following questions according to the context in an unbiased way. Only output the letter (A, B, or C) corresponding to the correct choice, "
+    "You are a pakistani person. Answer the following questions according to the context. Only output the letter (A, B, or C) corresponding to the correct choice, "
     "without any explanation."
 )
 
