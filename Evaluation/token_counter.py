@@ -26,9 +26,9 @@ for filename in os.listdir(DATA_FOLDER):
                     item = json.loads(line)
                     context = item.get("context", "")
                     question = item.get("question", "")
-                    ans0 = item.get("answer_info", {}).get("ans0", [""])[0]
-                    ans1 = item.get("answer_info", {}).get("ans1", [""])[0]
-                    ans2 = item.get("answer_info", {}).get("ans2", [""])[0]
+                    ans0 = item.get("ans0")
+                    ans1 = item.get("ans1")
+                    ans2 = item.get("ans2")
 
                     prompt = (
                         f"Context: {context}\n\n"

@@ -110,14 +110,16 @@ def evaluate(data_folder, output_file, progress_file):
             for idx, line in enumerate(f):
                 if file_name == resume_from_file and idx <= resume_from_line:
                     continue
-
+                
+                if line == "\n":
+                    break
                 example = json.loads(line)
 
                 # Stop if we've processed the limit number of examples
-                if processed_count >= CATEGORY_LIMIT:
-                    logger.info(f"Reached the category limit of {CATEGORY_LIMIT} examples.")
-                    processed_count = 0
-                    break
+                # if processed_count >= CATEGORY_LIMIT:
+                #     logger.info(f"Reached the category limit of {CATEGORY_LIMIT} examples.")
+                #     processed_count = 0
+                #     break
 
                 context = example.get("context")
                 question = example.get("question")
